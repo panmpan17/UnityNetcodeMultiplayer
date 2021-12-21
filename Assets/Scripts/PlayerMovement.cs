@@ -103,6 +103,12 @@ public class PlayerMovement : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         enabled = IsOwner;
+
+        if (NetworkSceneInfo.ins != null)
+        {
+            SceneEntry entry = NetworkSceneInfo.ins.FindSuitableEntries((uint)NetworkObject.OwnerClientId);
+            transform.position = entry.transform.position;
+        }
     }
     #endregion
 }
