@@ -28,6 +28,16 @@ public class MichaelNetworkManager : MonoBehaviour
 
         m_networkManager = GetComponent<NetworkManager>();
         m_netTransport = GetComponent<UNetTransport>();
+
+        #if UNITY_EDITOR
+        // string activeSceneName = SceneManager.GetActiveScene().name;
+        switch (SceneManager.GetActiveScene().name)
+        {
+            case "SampleScene":
+                m_networkManager.StartHost();
+                break;
+        }
+        #endif
     }
 
     public void ChangeIPnPort(string ip, int port)
@@ -66,8 +76,13 @@ public class MichaelNetworkManager : MonoBehaviour
 
     void OnSceneLoadComplete(ulong clientId, string sceneName, LoadSceneMode loadSceneMode)
     {
-        Debug.Log(clientId);
-        Debug.Log(sceneName);
-        Debug.Log(loadSceneMode);
+        NetworkBehaviour[] networkBehaviours = FindObjectsOfType<NetworkBehaviour>();
+        for (int i = 0; i < networkBehaviours.Length; i++)
+        {
+            networkBehaviours[i].BroadcastMessage("OnSceneChanged");
+        }
+        // Debug.Log(clientId);
+        // Debug.Log(sceneName);
+        // Debug.Log(loadSceneMode);
     }
 }

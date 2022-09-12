@@ -1,18 +1,21 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using MPack;
 using Unity.Netcode;
 using Unity.Netcode.Components;
+
 
 public class PlayerMovement : NetworkBehaviour
 {
     public float walkAcceleration;
     public float maxWalkSpeed;
-    public float walkDampingSpeed;
+    // public float walkDampingSpeed;
 
     public float jumpForce;
     public Timer jumpTimer;
+    public Timer keepJumpForcetimer;
     private bool leaveGround;
 
     private Rigidbody2D m_rigidbody;
@@ -30,73 +33,127 @@ public class PlayerMovement : NetworkBehaviour
         jumpTimer.Running = false;
     }
 
-    void Update()
+    private void HandleMovement()
     {
-        int speedChanged = 0;
-        if (Input.GetKey(KeyCode.A))
+        Vector2 delta = m_rigidbody.velocity;
+
+        // Handle horizontal movement
+        float xAxis = (Input.GetKey(KeyCode.A) ? -1: 0) + (Input.GetKey(KeyCode.D) ? 1 : 0);
+        delta.x = Mathf.Clamp(delta.x + (xAxis * walkAcceleration * Time.deltaTime), -maxWalkSpeed, maxWalkSpeed);
+
+        if (m_smartBoxCollider.LeftTouched && delta.x < 0) delta.x = 0;
+        else if (m_smartBoxCollider.RightTouched && delta.x > 0) delta.x = 0;
+
+        if (delta.x > 0 && transform.localScale.x < 0) transform.localScale = new Vector3(1, 1, 1);
+        else if (delta.x < 0 && transform.localScale.x > 0) transform.localScale = new Vector3(-1, 1, 1);
+
+        if (Input.GetKeyDown(KeyCode.Space))
         {
-            speedChanged = -1;
+            jumpTimer.Reset();
         }
-        if (Input.GetKey(KeyCode.D))
+        if (Input.GetKeyUp(KeyCode.Space))
         {
-            speedChanged += 1;
-        }
-        if (speedChanged != 0)
-        {
-            movementVec.x = Mathf.MoveTowards(movementVec.x, speedChanged > 0 ? maxWalkSpeed : -maxWalkSpeed, walkAcceleration * Time.deltaTime);
-        }
-        else
-        {
-            movementVec.x = Mathf.MoveTowards(movementVec.x, 0, walkDampingSpeed * Time.deltaTime);
+            jumpTimer.Running = false;
         }
 
-        if (m_smartBoxCollider.LeftTouched && movementVec.x < 0)
-        {
-            movementVec.x = 0;
-        }
-        if (m_smartBoxCollider.RightTouched && movementVec.x > 0)
-        {
-            movementVec.x = 0;
-        }
-
-        movementVec.y = m_rigidbody.velocity.y;
+        // Handle jump movement
         if (jumpTimer.Running)
         {
             if (m_smartBoxCollider.DownTouched)
             {
-                if (leaveGround)
-                {
-                    jumpTimer.Running = false;
-                    return;
-                }
-                else
-                {
-                    leaveGround = true;
-                }
+                delta.y = jumpForce;
+                keepJumpForcetimer.Reset();
             }
-
-            if (!Input.GetKey(KeyCode.Space))
+            else if (jumpTimer.UpdateEnd)
             {
                 jumpTimer.Running = false;
+            }
+        }
+        if (keepJumpForcetimer.Running)
+        {
+            if (!jumpTimer.Running)
+            {
+                keepJumpForcetimer.Running = false;
                 return;
             }
-
-            if (!jumpTimer.UpdateEnd)
+            if (keepJumpForcetimer.UpdateEnd)
             {
-                movementVec.y = jumpForce;
+                keepJumpForcetimer.Running = false;
             }
-        }
-        else
-        {
-            if (m_smartBoxCollider.DownTouched && Input.GetKey(KeyCode.Space))
-            {
-                jumpTimer.Reset();
-                movementVec.y = jumpForce;
-                leaveGround = false;
-            }
+            delta.y = jumpForce;
         }
 
-        m_rigidbody.velocity = movementVec;
+        m_rigidbody.velocity = delta;
+    }
+
+    void Update()
+    {
+        HandleMovement();
+        // int speedChanged = 0;
+        // if (Input.GetKey(KeyCode.A))
+        // {
+        //     speedChanged = -1;
+        // }
+        // if (Input.GetKey(KeyCode.D))
+        // {
+        //     speedChanged += 1;
+        // }
+        // if (speedChanged != 0)
+        // {
+        //     movementVec.x = Mathf.MoveTowards(movementVec.x, speedChanged > 0 ? maxWalkSpeed : -maxWalkSpeed, walkAcceleration * Time.deltaTime);
+        // }
+        // else
+        // {
+        //     movementVec.x = Mathf.MoveTowards(movementVec.x, 0, walkDampingSpeed * Time.deltaTime);
+        // }
+
+        // if (m_smartBoxCollider.LeftTouched && movementVec.x < 0)
+        // {
+        //     movementVec.x = 0;
+        // }
+        // if (m_smartBoxCollider.RightTouched && movementVec.x > 0)
+        // {
+        //     movementVec.x = 0;
+        // }
+
+        // movementVec.y = m_rigidbody.velocity.y;
+        // if (jumpTimer.Running)
+        // {
+        //     if (m_smartBoxCollider.DownTouched)
+        //     {
+        //         if (leaveGround)
+        //         {
+        //             jumpTimer.Running = false;
+        //             return;
+        //         }
+        //         else
+        //         {
+        //             leaveGround = true;
+        //         }
+        //     }
+
+        //     if (!Input.GetKey(KeyCode.Space))
+        //     {
+        //         jumpTimer.Running = false;
+        //         return;
+        //     }
+
+        //     if (!jumpTimer.UpdateEnd)
+        //     {
+        //         movementVec.y = jumpForce;
+        //     }
+        // }
+        // else
+        // {
+        //     if (m_smartBoxCollider.DownTouched && Input.GetKey(KeyCode.Space))
+        //     {
+        //         jumpTimer.Reset();
+        //         movementVec.y = jumpForce;
+        //         leaveGround = false;
+        //     }
+        // }
+
+        // m_rigidbody.velocity = movementVec;
     }
 
     #region Networkkkkking
@@ -104,9 +161,20 @@ public class PlayerMovement : NetworkBehaviour
     {
         enabled = IsOwner;
 
-        if (NetworkSceneInfo.ins != null)
+        NetworkSceneInfo sceneInfo = FindObjectOfType<NetworkSceneInfo>();
+        if (sceneInfo != null)
         {
-            SceneEntry entry = NetworkSceneInfo.ins.FindSuitableEntries((uint)NetworkObject.OwnerClientId);
+            SceneEntry entry = sceneInfo.FindSuitableEntries((uint)NetworkObject.OwnerClientId);
+            transform.position = entry.transform.position;
+        }
+    }
+
+    public void OnSceneChanged()
+    {
+        NetworkSceneInfo sceneInfo = FindObjectOfType<NetworkSceneInfo>();
+        if (sceneInfo != null)
+        {
+            SceneEntry entry = sceneInfo.FindSuitableEntries((uint)NetworkObject.OwnerClientId);
             transform.position = entry.transform.position;
         }
     }

@@ -4,15 +4,8 @@ using UnityEngine;
 
 public class NetworkSceneInfo : MonoBehaviour
 {
-    public static NetworkSceneInfo ins;
-
     public SceneEntry[] sceneEntries;
     public EntryFallbackRule entryFallback;
-
-    private void Awake()
-    {
-        ins = this;
-    }
 
     public SceneEntry FindSuitableEntries(uint clientId)
     {
